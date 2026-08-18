@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<ruleset name="spryker-community/inspector">
+    <description>
+        Coding standard for this package. Mirrors the Spryker project standard.
+
+        Spryker.Commenting.FileDocBlock is excluded on purpose: it enforces the proprietary
+        "This file is part of the Spryker Commerce OS." header, and phpcbf rewrites the MIT
+        header of every file to it. This package is MIT licensed, so running an unmodified
+        Spryker ruleset over src/ silently relicenses the file headers.
+
+        Run `composer install` in this directory first so vendor/spryker/code-sniffer exists.
+    </description>
+
+    <config name="php_version" value="80313"/>
+
+    <file>src/</file>
+
+    <rule ref="vendor/spryker/code-sniffer/Spryker/ruleset.xml">
+        <exclude name="Spryker.Commenting.FileDocBlock"/>
+        <exclude name="Spryker.Commenting.DocBlock"/>
+        <exclude name="Spryker.Commenting.DocBlockConst"/>
+        <exclude name="Spryker.Commenting.InlineDocBlock"/>
+        <exclude name="Spryker.Commenting.DocBlockApiAnnotation"/>
+        <exclude name="Spryker.Commenting.DocBlockReturnVoid"/>
+    </rule>
+
+    <rule ref="vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml"/>
+
+    <rule ref="Spryker.Internal.SprykerDisallowFunctions">
+        <properties>
+            <property name="phpVersion" value="8.3"/>
+        </properties>
+    </rule>
+
+    <rule ref="Spryker.Namespaces.SprykerNamespace">
+        <properties>
+            <property name="namespace" value="SprykerCommunity"/>
+        </properties>
+    </rule>
+
+    <rule ref="SlevomatCodingStandard.Functions.RequireTrailingCommaInDeclaration"/>
+    <rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes"/>
+    <rule ref="SlevomatCodingStandard.ControlStructures.EarlyExit"/>
+    <rule ref="SlevomatCodingStandard.Functions.UnusedParameter"/>
+    <rule ref="SlevomatCodingStandard.Variables.UnusedVariable"/>
+
+    <rule ref="SlevomatCodingStandard.ControlStructures.DisallowNullSafeObjectOperator">
+        <severity>0</severity>
+    </rule>
+    <rule ref="SlevomatCodingStandard.Functions.DisallowTrailingCommaInDeclaration">
+        <severity>0</severity>
+    </rule>
+</ruleset>
