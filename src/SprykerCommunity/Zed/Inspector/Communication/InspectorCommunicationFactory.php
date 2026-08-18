@@ -12,7 +12,10 @@ namespace SprykerCommunity\Zed\Inspector\Communication;
 use Inspector\Symfony\Bundle\Command\InspectorTestCommand;
 use Spryker\Shared\Log\LoggerTrait;
 use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
+use Spryker\Zed\User\Business\UserFacadeInterface;
 use SprykerCommunity\Service\Inspector\InspectorServiceInterface;
+use SprykerCommunity\Zed\Inspector\Communication\Subscriber\InspectorRequestEventSubscriber;
+use SprykerCommunity\Zed\Inspector\Communication\Twig\InspectorTwigTracer;
 use SprykerCommunity\Zed\Inspector\InspectorDependencyProvider;
 
 class InspectorCommunicationFactory extends AbstractCommunicationFactory
@@ -32,8 +35,26 @@ class InspectorCommunicationFactory extends AbstractCommunicationFactory
         );
     }
 
+    public function createInspectorRequestEventSubscriber(): InspectorRequestEventSubscriber
+    {
+        return new InspectorRequestEventSubscriber(
+            $this->getInspectorService(),
+            $this->getUserFacade(),
+        );
+    }
+
+    public function createInspectorTwigTracer(): InspectorTwigTracer
+    {
+        return new InspectorTwigTracer($this->getInspectorService());
+    }
+
     public function getInspectorService(): InspectorServiceInterface
     {
         return $this->getProvidedDependency(InspectorDependencyProvider::SERVICE_INSPECTOR);
+    }
+
+    public function getUserFacade(): UserFacadeInterface
+    {
+        return $this->getProvidedDependency(InspectorDependencyProvider::FACADE_USER);
     }
 }

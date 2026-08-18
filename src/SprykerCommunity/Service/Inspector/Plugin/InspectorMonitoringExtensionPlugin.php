@@ -26,7 +26,12 @@ use Spryker\Service\MonitoringExtension\Dependency\Plugin\MonitoringExtensionPlu
  */
 class InspectorMonitoringExtensionPlugin extends AbstractPlugin implements MonitoringExtensionPluginInterface
 {
-    protected const string TRANSACTION_TYPE_CONSOLE = 'console';
+    /**
+     * Matches the transaction type the Inspector Symfony bundle uses for console commands
+     * (\Inspector\Symfony\Bundle\Listeners\ConsoleEventsSubscriber), so commands are
+     * classified the same way regardless of which integration reported them.
+     */
+    protected const string TRANSACTION_TYPE_COMMAND = 'command';
 
     protected const string DEFAULT_TRANSACTION_NAME = 'zed';
 
@@ -83,7 +88,7 @@ class InspectorMonitoringExtensionPlugin extends AbstractPlugin implements Monit
      */
     public function setTransactionName(string $name): void
     {
-        if ($this->isIgnoredCommand($name)) {
+        if ($this->isIgnored($name)) {
             $this->getService()->ignoreTransaction();
 
             return;
@@ -95,22 +100,29 @@ class InspectorMonitoringExtensionPlugin extends AbstractPlugin implements Monit
     }
 
     /**
-     * Spryker names console transactions on ConsoleTerminateEvent, prefixed with the binary path,
-     * so the command name has to be recovered from it before matching the ignore patterns.
-     * Discarding here also drops anything the command already recorded, which is the intent for
-     * scheduler-driven commands.
+     * Discarding here also drops anything already recorded for the transaction, which is the
+     * intent for scheduler-driven commands and for noisy endpoints such as health checks.
      */
-    protected function isIgnoredCommand(string $transactionName): bool
+    protected function isIgnored(string $transactionName): bool
     {
         if (PHP_SAPI !== static::SAPI_CLI) {
-            return false;
+            return $this->getConfig()->isTransactionIgnored($transactionName);
         }
 
-        $commandName = str_starts_with($transactionName, static::CONSOLE_TRANSACTION_NAME_PREFIX)
-            ? substr($transactionName, strlen(static::CONSOLE_TRANSACTION_NAME_PREFIX))
-            : $transactionName;
+        return $this->getConfig()->isCommandIgnored($this->extractCommandName($transactionName));
+    }
 
-        return $this->getConfig()->isCommandIgnored(trim($commandName));
+    /**
+     * Spryker names console transactions on ConsoleTerminateEvent, prefixed with the binary path,
+     * so the command name has to be recovered from it before matching the ignore patterns.
+     */
+    protected function extractCommandName(string $transactionName): string
+    {
+        if (!str_starts_with($transactionName, static::CONSOLE_TRANSACTION_NAME_PREFIX)) {
+            return trim($transactionName);
+        }
+
+        return trim(substr($transactionName, strlen(static::CONSOLE_TRANSACTION_NAME_PREFIX)));
     }
 
     /**
@@ -140,6 +152,10 @@ class InspectorMonitoringExtensionPlugin extends AbstractPlugin implements Monit
      * is the only method it invokes — so the transaction has to be completed from here. The result is
      * set eagerly and downgraded by setError(), because nothing signals the end of a Zed request
      * before Inspector flushes on shutdown.
+     *
+     * When InspectorEventDispatcherPlugin is registered it overwrites this result with the actual
+     * HTTP status code on kernel.terminate. This eager value is what remains without it, and for
+     * console commands, where no terminate event reaches this plugin.
      */
     protected function initializeTransaction(): void
     {
@@ -171,7 +187,7 @@ class InspectorMonitoringExtensionPlugin extends AbstractPlugin implements Monit
     public function markAsConsoleCommand(): void
     {
         $this->getService()->ensureTransaction($this->applicationName ?? static::DEFAULT_TRANSACTION_NAME);
-        $this->getService()->setTransactionType(static::TRANSACTION_TYPE_CONSOLE);
+        $this->getService()->setTransactionType(static::TRANSACTION_TYPE_COMMAND);
     }
 
     /**

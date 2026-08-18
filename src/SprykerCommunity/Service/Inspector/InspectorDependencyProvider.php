@@ -73,6 +73,7 @@ class InspectorDependencyProvider extends AbstractBundleDependencyProvider
 
         $configuration = (new Configuration($this->getConfig()->getIngestionKey()))
             ->setEnabled($isEnabled)
+            ->setMaxItems($this->getConfig()->getMaxItems())
             ->setTransport($this->getConfig()->getTransport());
 
         if (!$this->getConfig()->hasValidUrl()) {

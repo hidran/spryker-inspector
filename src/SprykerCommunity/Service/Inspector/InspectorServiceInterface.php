@@ -44,6 +44,49 @@ interface InspectorServiceInterface
 
     /**
      * Specification:
+     * - Returns true when monitoring is on and a transaction is open to attach segments to.
+     * - Callers on a hot path should check this before assembling any segment context.
+     *
+     * @api
+     */
+    public function canAddSegments(): bool;
+
+    /**
+     * Specification:
+     * - Returns true when rendered Twig templates should be reported as segments.
+     *
+     * @api
+     */
+    public function isTwigTrackingEnabled(): bool;
+
+    /**
+     * Specification:
+     * - Returns true when executed Propel statements should be reported as segments.
+     *
+     * @api
+     */
+    public function isPropelTrackingEnabled(): bool;
+
+    /**
+     * Specification:
+     * - Returns the minimum duration in milliseconds a Propel statement must take to be reported.
+     * - 0 reports every statement.
+     *
+     * @api
+     */
+    public function getPropelSlowQueryThresholdMilliseconds(): float;
+
+    /**
+     * Specification:
+     * - Returns true when Propel statements should be reported with bound values interpolated.
+     * - Bound values routinely contain personal data, so this is off unless explicitly enabled.
+     *
+     * @api
+     */
+    public function isQueryBindingsTrackingEnabled(): bool;
+
+    /**
+     * Specification:
      * - Opens a transaction when none is open yet, otherwise does nothing.
      * - Required before any segment can be recorded.
      *
@@ -78,11 +121,20 @@ interface InspectorServiceInterface
 
     /**
      * Specification:
-     * - Sets the outcome of the open transaction, e.g. success or error.
+     * - Sets the outcome of the open transaction, e.g. success, error or an HTTP status code.
      *
      * @api
      */
     public function setTransactionResult(string $result): void;
+
+    /**
+     * Specification:
+     * - Attaches the acting user to the open transaction, so traces can be filtered by user.
+     * - Does nothing when monitoring is off or no transaction is open.
+     *
+     * @api
+     */
+    public function setTransactionUser(int|string $userId, ?string $name = null, ?string $email = null): void;
 
     /**
      * Specification:

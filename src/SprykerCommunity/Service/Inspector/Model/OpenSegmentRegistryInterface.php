@@ -27,4 +27,9 @@ interface OpenSegmentRegistryInterface
      * calls using the same key are closed in reverse order.
      */
     public function pull(string $key): ?Segment;
+
+    /**
+     * Drops every open segment, for when the surrounding transaction is discarded.
+     */
+    public function clear(): void;
 }

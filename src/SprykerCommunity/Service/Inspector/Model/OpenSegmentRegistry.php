@@ -31,4 +31,9 @@ class OpenSegmentRegistry implements OpenSegmentRegistryInterface
 
         return array_pop($this->segments[$key]);
     }
+
+    public function clear(): void
+    {
+        $this->segments = [];
+    }
 }

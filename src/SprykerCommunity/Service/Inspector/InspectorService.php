@@ -70,6 +70,56 @@ class InspectorService extends AbstractService implements InspectorServiceInterf
      *
      * @api
      */
+    public function canAddSegments(): bool
+    {
+        return $this->getFactory()->getInspector()->canAddSegments();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function isTwigTrackingEnabled(): bool
+    {
+        return $this->getFactory()->getConfig()->isTwigTrackingEnabled();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function isPropelTrackingEnabled(): bool
+    {
+        return $this->getFactory()->getConfig()->isPropelTrackingEnabled();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function getPropelSlowQueryThresholdMilliseconds(): float
+    {
+        return $this->getFactory()->getConfig()->getPropelSlowQueryThresholdMilliseconds();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function isQueryBindingsTrackingEnabled(): bool
+    {
+        return $this->getFactory()->getConfig()->isQueryBindingsTrackingEnabled();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
     public function ensureTransaction(string $name): void
     {
         $inspector = $this->getFactory()->getInspector();
@@ -124,13 +174,29 @@ class InspectorService extends AbstractService implements InspectorServiceInterf
     {
         $transaction = $this->getFactory()->getInspector()->transaction();
 
-        if ($transaction === null) {
+        if ($transaction === null || $transaction->http !== null) {
             return;
         }
 
         $transaction->markAsRequest();
 
         $this->removeSensitiveRequestData($transaction);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function setTransactionUser(int|string $userId, ?string $name = null, ?string $email = null): void
+    {
+        $transaction = $this->getFactory()->getInspector()->transaction();
+
+        if ($transaction === null) {
+            return;
+        }
+
+        $transaction->withUser($userId, $name, $email);
     }
 
     /**
@@ -219,6 +285,10 @@ class InspectorService extends AbstractService implements InspectorServiceInterf
     public function ignoreTransaction(): void
     {
         $this->getFactory()->getInspector()->reset();
+
+        // Segments opened against the discarded transaction can never be ended meaningfully,
+        // and would otherwise be closed against whatever transaction is opened next.
+        $this->getFactory()->getOpenSegmentRegistry()->clear();
     }
 
     /**

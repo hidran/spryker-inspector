@@ -22,6 +22,11 @@ class InspectorConfig extends AbstractBundleConfig
     protected const bool DEFAULT_IS_ENABLED = true;
 
     /**
+     * Mirrors \Inspector\Configuration::$maxItems, so the default stays a no-op.
+     */
+    protected const int DEFAULT_MAX_ITEMS = 150;
+
+    /**
      * @var array<int, string>
      */
     protected const array DEFAULT_ENABLED_APPLICATIONS = ['ZED'];
@@ -63,14 +68,59 @@ class InspectorConfig extends AbstractBundleConfig
         return (array)$this->get(InspectorConstants::IGNORED_COMMANDS, []);
     }
 
-    /**
-     * Reuses the wildcard matcher shipped with the Inspector Symfony bundle so that patterns
-     * behave exactly as they do for the bundle's own ignore_commands option.
-     */
     public function isCommandIgnored(string $commandName): bool
     {
-        foreach ($this->getIgnoredCommands() as $pattern) {
-            if (Filters::matchWithWildcard((string)$pattern, $commandName)) {
+        return $this->matchesAnyPattern($commandName, $this->getIgnoredCommands());
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getIgnoredTransactions(): array
+    {
+        return (array)$this->get(InspectorConstants::IGNORED_TRANSACTIONS, []);
+    }
+
+    public function isTransactionIgnored(string $transactionName): bool
+    {
+        return $this->matchesAnyPattern($transactionName, $this->getIgnoredTransactions());
+    }
+
+    public function getMaxItems(): int
+    {
+        return (int)$this->get(InspectorConstants::MAX_ITEMS, static::DEFAULT_MAX_ITEMS);
+    }
+
+    public function isTwigTrackingEnabled(): bool
+    {
+        return (bool)$this->get(InspectorConstants::IS_TWIG_TRACKING_ENABLED, false);
+    }
+
+    public function isPropelTrackingEnabled(): bool
+    {
+        return (bool)$this->get(InspectorConstants::IS_PROPEL_TRACKING_ENABLED, false);
+    }
+
+    public function getPropelSlowQueryThresholdMilliseconds(): float
+    {
+        return (float)$this->get(InspectorConstants::PROPEL_SLOW_QUERY_THRESHOLD_MILLISECONDS, 0.0);
+    }
+
+    public function isQueryBindingsTrackingEnabled(): bool
+    {
+        return (bool)$this->get(InspectorConstants::IS_QUERY_BINDINGS_TRACKING_ENABLED, false);
+    }
+
+    /**
+     * Reuses the wildcard matcher shipped with the Inspector Symfony bundle so that patterns
+     * behave exactly as they do for the bundle's own ignore_commands and ignore_routes options.
+     *
+     * @param array<int, string> $patterns
+     */
+    protected function matchesAnyPattern(string $subject, array $patterns): bool
+    {
+        foreach ($patterns as $pattern) {
+            if (Filters::matchWithWildcard((string)$pattern, $subject)) {
                 return true;
             }
         }
