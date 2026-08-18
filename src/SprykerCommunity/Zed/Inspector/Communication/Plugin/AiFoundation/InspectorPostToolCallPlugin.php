@@ -21,7 +21,11 @@ use Spryker\Zed\Kernel\Communication\AbstractPlugin;
  */
 class InspectorPostToolCallPlugin extends AbstractPlugin implements PostToolCallPluginInterface
 {
-    public const string SEGMENT_TYPE = 'ai-tool';
+    /**
+     * Matches the tool segment type emitted by Inspector's own Neuron observer, so tool calls are
+     * grouped with agent activity in the dashboard rather than appearing as generic segments.
+     */
+    public const string SEGMENT_TYPE = 'agent.tool';
 
     /**
      * {@inheritDoc}

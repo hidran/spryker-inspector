@@ -23,7 +23,12 @@ use Spryker\Zed\Kernel\Communication\AbstractPlugin;
  */
 class InspectorPostPromptPlugin extends AbstractPlugin implements PostPromptPluginInterface
 {
-    protected const string SEGMENT_TYPE = 'ai';
+    /**
+     * Inspector classifies AI activity by the "agent." segment type prefix used by its own
+     * Neuron observer (\Inspector\Neuron\InspectorObserver::SEGMENT_TYPE). Segments outside that
+     * namespace still appear in the trace, but not under the dashboard's Agent section.
+     */
+    protected const string SEGMENT_TYPE = 'agent.inference';
 
     protected const string UNKNOWN_VALUE = 'unknown';
 

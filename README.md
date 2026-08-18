@@ -163,9 +163,13 @@ vendor/bin/console cache:class-resolver:build
 | HTTP context (method, URL, headers) | `Transaction::markAsRequest()`, with cookies and authorization headers stripped |
 | Transaction result | `success`, downgraded to `error` by `setError()` |
 | Errors | `Spryker\Shared\ErrorHandler\ErrorLogger` → `setError()` |
-| AI prompt segment | `PostPromptPluginInterface`, duration from `PromptResponse.inferenceTimeMs` |
+| AI prompt segment (`agent.inference`) | `PostPromptPluginInterface`, duration from `PromptResponse.inferenceTimeMs` |
 | AI token usage and cost | `Inspector\Models\Token` from `PromptResponse.message.usage` |
-| AI tool call segment | `PreToolCallPluginInterface` / `PostToolCallPluginInterface` |
+| AI tool call segment (`agent.tool`) | `PreToolCallPluginInterface` / `PostToolCallPluginInterface` |
+
+AI segments use the `agent.` type prefix that Inspector's own Neuron observer uses
+(`\Inspector\Neuron\InspectorObserver::SEGMENT_TYPE`), so they are classified as agent activity in
+the dashboard. Inspector does not document this rule; it is taken from that reference implementation.
 
 Cookies and `Authorization`-style headers are removed before sending. `markAsRequest()` captures
 `$_COOKIE` and `apache_request_headers()` verbatim, which in Zed includes the Back Office session
@@ -176,7 +180,7 @@ cookie.
 `InspectorServiceInterface` is the entry point for reporting your own segments:
 
 ```php
-$inspectorService->addCompletedSegment('ai', 'openai/gpt-4o', 1234.5, ['model' => 'gpt-4o']);
+$inspectorService->addCompletedSegment('agent.inference', 'openai/gpt-4o', 1234.5, ['model' => 'gpt-4o']);
 $inspectorService->startSegment('integration', 'erp-sync');
 $inspectorService->endOpenSegment('integration', 'erp-sync', ['status' => 'ok']);
 ```
