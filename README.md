@@ -266,7 +266,33 @@ process rather than surfacing as query failures, but the code is still on the ho
   Inspector, and stops the statements grouping. It is off by default and should stay off unless you
   have a specific reason and have checked it against your data protection obligations.
 
-### 9. Report outbound HTTP requests (optional)
+### 9. Report console commands and queue workers (recommended)
+
+Spryker reports console transactions on `ConsoleTerminateEvent`, once the command has already
+finished. Nothing a command does can be recorded against a transaction that does not exist yet, so
+without this plugin console runs arrive as a bare duration — no database, HTTP, prompt or tool-call
+segments. That covers **queue workers**, which Spryker runs as console commands, so AI work
+triggered from the queue is otherwise invisible.
+
+`src/Pyz/Zed/Console/ConsoleDependencyProvider.php`:
+
+```php
+use SprykerCommunity\Zed\Inspector\Communication\Plugin\Console\InspectorConsoleEventSubscriberPlugin;
+
+public function getEventSubscriber(Container $container): array
+{
+    return [
+        new MonitoringConsolePlugin(),
+        new InspectorConsoleEventSubscriberPlugin(),
+    ];
+}
+```
+
+The transaction is opened at `ConsoleEvents::COMMAND` and Spryker renames it to its own
+`vendor/bin/console <command>` form at terminate, so transaction naming does not change. The
+command's arguments and options are attached as context.
+
+### 10. Report outbound HTTP requests (optional)
 
 The Symfony bundle traces outbound HTTP by decorating the one `HttpClientInterface` service in the
 container. Spryker has no such service — `spryker/guzzle` is a metapackage with no code, and every
@@ -336,7 +362,7 @@ Notes on behaviour:
   in the URL userinfo component are always stripped. Query strings are dropped entirely unless
   `IS_HTTP_QUERY_TRACKING_ENABLED` is set — they routinely carry API keys and personal data.
 
-### 10. Rebuild caches
+### 11. Rebuild caches
 
 ```bash
 vendor/bin/console cache:empty-all
@@ -357,7 +383,8 @@ vendor/bin/console cache:class-resolver:build
 | Response context (status, content type) | `kernel.response` | step 6 |
 | `view.twig` segment per template | Twig's `ProfilerNodeVisitor` | step 7 |
 | `db.propel` segment per statement | Propel connection `classname` | step 8 |
-| `http.client` segment per outbound request | Guzzle handler stack middleware | step 9 |
+| Console transaction opened at command start | `ConsoleEvents::COMMAND` | step 9 |
+| `http.client` segment per outbound request | Guzzle handler stack middleware | step 10 |
 | AI prompt segment (`agent.inference`) | `PostPromptPluginInterface`, duration from `PromptResponse.inferenceTimeMs` | step 5 |
 | AI token usage and cost | `Inspector\Models\Token` from `PromptResponse.message.usage` | step 5 |
 | AI tool call segment (`agent.tool`) | `PreToolCallPluginInterface` / `PostToolCallPluginInterface` | step 5 |
@@ -388,8 +415,9 @@ $inspectorService->endOpenSegment('integration', 'erp-sync', ['status' => 'ok'])
 - Spryker never calls `markStartTransaction()` or `markEndOfTransaction()` in Zed. Without the
   event dispatcher plugin (step 6) the transaction result is set when the transaction is named and
   downgraded on error, rather than resolved at request end.
-- Console commands get no lifecycle segments. Spryker reports console transactions on
-  `ConsoleTerminateEvent`, after the work is done, so there is nothing to wrap.
+- Console commands get no lifecycle segments of their own. The transaction is opened at
+  `ConsoleEvents::COMMAND` (step 9) so everything the command does is recorded, but the command
+  body is not itself wrapped in a segment.
 - Transactions are ignored by Spryker's `module/controller/action` name, which is only known at
   `kernel.controller`. Anything recorded before that point is discarded along with the transaction.
 - Twig segments cover templates, not blocks or macros. Reporting every block would exhaust

@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+
+- `InspectorConsoleEventSubscriberPlugin` opens the transaction at `ConsoleEvents::COMMAND`, the
+  counterpart of the Symfony bundle's `ConsoleEventsSubscriber`.
+- `InspectorServiceInterface::isCommandIgnored()`.
+
+### Notes
+
+- Spryker reports console transactions on `ConsoleTerminateEvent`, once the command has already
+  finished, so until now console runs arrived as a bare duration with no segments at all. This
+  applies to queue workers too, which Spryker runs as console commands, so AI work triggered from
+  the queue was invisible.
+- The transaction is still renamed by Spryker to `vendor/bin/console <command>` at terminate, so
+  transaction naming is unchanged.
+- With this registered, an AI prompt that calls a tool produces the full agentic loop:
+  `http.client` (model decides), `agent.tool` (tool runs), `http.client` (model continues),
+  inside one `agent.inference`.
+
 ## 1.2.0
 
 ### Added

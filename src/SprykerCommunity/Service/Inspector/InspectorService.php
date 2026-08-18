@@ -81,6 +81,16 @@ class InspectorService extends AbstractService implements InspectorServiceInterf
      *
      * @api
      */
+    public function isCommandIgnored(string $commandName): bool
+    {
+        return $this->getFactory()->getConfig()->isCommandIgnored($commandName);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
     public function isTwigTrackingEnabled(): bool
     {
         return $this->getFactory()->getConfig()->isTwigTrackingEnabled();

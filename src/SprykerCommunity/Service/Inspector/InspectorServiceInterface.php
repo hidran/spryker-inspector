@@ -54,6 +54,15 @@ interface InspectorServiceInterface
 
     /**
      * Specification:
+     * - Returns true when the given console command is excluded from reporting.
+     * - Matched against INSPECTOR:IGNORED_COMMANDS, which supports wildcards.
+     *
+     * @api
+     */
+    public function isCommandIgnored(string $commandName): bool;
+
+    /**
+     * Specification:
      * - Returns true when rendered Twig templates should be reported as segments.
      *
      * @api
