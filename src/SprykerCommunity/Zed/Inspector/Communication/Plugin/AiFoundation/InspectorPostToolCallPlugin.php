@@ -17,16 +17,14 @@ use Spryker\Zed\Kernel\Communication\AbstractPlugin;
  * Closes the Inspector segment opened by InspectorPreToolCallPlugin and attaches the
  * tool arguments and result to it.
  *
+ * The segment is held after closing so that InspectorPostPromptPlugin can nest it under the
+ * agent call it belongs to, which is what lets the dashboard present one call that opens up to
+ * reveal its tools instead of listing tools alongside it.
+ *
  * @method \SprykerCommunity\Zed\Inspector\Communication\InspectorCommunicationFactory getFactory()
  */
 class InspectorPostToolCallPlugin extends AbstractPlugin implements PostToolCallPluginInterface
 {
-    /**
-     * Matches the tool segment type emitted by Inspector's own Neuron observer, so tool calls are
-     * grouped with agent activity in the dashboard rather than appearing as generic segments.
-     */
-    public const string SEGMENT_TYPE = 'agent.tool';
-
     /**
      * {@inheritDoc}
      *
@@ -34,12 +32,11 @@ class InspectorPostToolCallPlugin extends AbstractPlugin implements PostToolCall
      */
     public function postToolCall(AiToolCallTransfer $aiToolCallTransfer): void
     {
-        $this->getFactory()->getInspectorService()->endOpenSegment(
-            static::SEGMENT_TYPE,
+        $this->getFactory()->getInspectorService()->endAgentToolSegment(
             (string)$aiToolCallTransfer->getToolName(),
             [
-                'arguments' => $aiToolCallTransfer->getToolArguments(),
-                'result' => $aiToolCallTransfer->getToolResult(),
+                'Inputs' => $aiToolCallTransfer->getToolArguments(),
+                'Output' => $aiToolCallTransfer->getToolResult(),
                 'is_execution_allowed' => $aiToolCallTransfer->getIsExecutionAllowed(),
             ],
         );

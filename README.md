@@ -12,8 +12,9 @@ into segments for the request lifecycle, rendered templates, database statements
 | `view.twig` | each rendered Twig template |
 | `db.propel` | each executed database statement, with operation and table |
 | `http.client` | each outbound Guzzle request, with method, host and status code |
-| `agent.inference` | each AI prompt, with provider, model and token usage |
-| `agent.tool` | each AI tool call, with arguments and result |
+| `agent.workflow` | each AI call, with its inference and tool calls nested inside |
+| `agent.inference` | the prompt itself, with provider, model and token usage |
+| `agent.tool` | each tool the model called, with inputs and output |
 
 ## Why not the Inspector Symfony bundle
 
@@ -96,6 +97,10 @@ $config[InspectorConstants::IS_PROPEL_TRACKING_ENABLED] = filter_var(
 $config[InspectorConstants::PROPEL_SLOW_QUERY_THRESHOLD_MILLISECONDS] = (float)(
     getenv('INSPECTOR_PROPEL_SLOW_QUERY_THRESHOLD_MILLISECONDS') ?: 0
 );
+$config[InspectorConstants::IS_AGENT_TRANSACTION_TYPE_ENABLED] = filter_var(
+    getenv('INSPECTOR_IS_AGENT_TRANSACTION_TYPE_ENABLED') ?: true,
+    FILTER_VALIDATE_BOOLEAN,
+);
 $config[InspectorConstants::IS_HTTP_CLIENT_TRACKING_ENABLED] = filter_var(
     getenv('INSPECTOR_IS_HTTP_CLIENT_TRACKING_ENABLED') ?: false,
     FILTER_VALIDATE_BOOLEAN,
@@ -116,6 +121,7 @@ $config[InspectorConstants::IS_HTTP_CLIENT_TRACKING_ENABLED] = filter_var(
 | `IS_PROPEL_TRACKING_ENABLED` | `false` | Report database statements as `db.propel` segments. |
 | `PROPEL_SLOW_QUERY_THRESHOLD_MILLISECONDS` | `0` | Only report statements at least this slow. `0` reports all of them. |
 | `IS_QUERY_BINDINGS_TRACKING_ENABLED` | `false` | Interpolate bound values into reported statements. **Sends personal data — see below.** |
+| `IS_AGENT_TRANSACTION_TYPE_ENABLED` | `true` | Type a transaction that ran an AI call as `agent`, which is what lists it under the dashboard Agent section. |
 | `IS_HTTP_CLIENT_TRACKING_ENABLED` | `false` | Report outbound Guzzle requests as `http.client` segments. |
 | `IS_HTTP_QUERY_TRACKING_ENABLED` | `false` | Include query strings in reported URLs. **Sends API keys and personal data — see below.** |
 
@@ -385,16 +391,55 @@ vendor/bin/console cache:class-resolver:build
 | `db.propel` segment per statement | Propel connection `classname` | step 8 |
 | Console transaction opened at command start | `ConsoleEvents::COMMAND` | step 9 |
 | `http.client` segment per outbound request | Guzzle handler stack middleware | step 10 |
-| AI prompt segment (`agent.inference`) | `PostPromptPluginInterface`, duration from `PromptResponse.inferenceTimeMs` | step 5 |
+| Agent call (`agent.workflow`) with nested inference and tools | `PostPromptPluginInterface`, duration from `PromptResponse.inferenceTimeMs` | step 5 |
 | AI token usage and cost | `Inspector\Models\Token` from `PromptResponse.message.usage` | step 5 |
 | AI tool call segment (`agent.tool`) | `PreToolCallPluginInterface` / `PostToolCallPluginInterface` | step 5 |
 
 Without step 6 the transaction result stays `success`, downgraded to `error` by `setError()`,
 because Spryker itself never signals the end of a Zed request.
 
-AI segments use the `agent.` type prefix that Inspector's own Neuron observer uses
-(`\Inspector\Neuron\InspectorObserver::SEGMENT_TYPE`), so they are classified as agent activity in
-the dashboard. Inspector does not document this rule; it is taken from that reference implementation.
+### How AI calls are shaped
+
+Inspector presents agent activity as one call you open up to reveal what it did, not as a flat list
+of siblings. That shape comes from two things its Neuron observer does
+(`\Inspector\Neuron\InspectorObserver`), both reproduced here:
+
+- every AI segment uses the `agent.` type prefix and the observer's colour, and
+- the surrounding transaction is typed `agent`, which is what lists it under the dashboard's Agent
+  section.
+
+A prompt that calls a tool arrives like this:
+
+```
+transaction [type=agent]  ai-commerce/category-suggestion/index
+    process          kernel.request
+    controller       ai-commerce/category-suggestion/index
+        http.client      POST https://api.openai.com/v1/chat/completions
+        http.client      POST https://api.openai.com/v1/chat/completions
+        agent.workflow   <ai configuration name>
+            agent.tool       tool_call( get_content_items )
+            agent.inference  inference( openai/gpt-4o-mini )
+    process          kernel.response
+```
+
+Two details are worth knowing:
+
+**Nesting is reconstructed, not natural.** Inspector nests segments by the order they open and
+close, but Spryker has no pre-prompt extension point: a call is only observable once it has
+finished, by which time its tool segments have opened and closed. They are therefore held and
+re-parented onto the `agent.workflow` segment afterwards, which works because Inspector serializes
+segments at flush time.
+
+**`agent.workflow` and `agent.inference` report the same duration.** Spryker exposes a single
+`inferenceTimeMs` for the whole call rather than a figure per round trip, so the call and its
+inference necessarily span the same window. The nesting is kept anyway because it is the shape the
+dashboard expects.
+
+**Typing the transaction `agent` replaces its original type.** In Zed the transaction is a whole
+Back Office request or console command, so a request that happens to make one AI call is reported
+as an agent transaction rather than a `request` or `command` one. Inspector's own agent monitoring
+does exactly this. Set `IS_AGENT_TRANSACTION_TYPE_ENABLED` to `false` to keep the original type, at
+the cost of the Agent section staying empty.
 
 Cookies and `Authorization`-style headers are removed before sending. `markAsRequest()` captures
 `$_COOKIE` and `apache_request_headers()` verbatim, which in Zed includes the Back Office session
@@ -422,6 +467,9 @@ $inspectorService->endOpenSegment('integration', 'erp-sync', ['status' => 'ok'])
   `kernel.controller`. Anything recorded before that point is discarded along with the transaction.
 - Twig segments cover templates, not blocks or macros. Reporting every block would exhaust
   `MAX_ITEMS` on any real page.
+- Outbound `http.client` segments sit beside the agent call rather than inside it. They are
+  recorded by the Guzzle middleware, which has no way to know a prompt is running, and adopting
+  every request made during a prompt would wrongly pull unrelated calls into the agent call.
 - Outbound HTTP tracing is opt-in per client. The Symfony bundle decorates a single
   `HttpClientInterface` service and covers the whole application; Spryker has no equivalent, so the
   middleware has to be pushed onto each handler stack you want traced.

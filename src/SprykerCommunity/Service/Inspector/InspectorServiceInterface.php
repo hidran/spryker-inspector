@@ -237,6 +237,47 @@ interface InspectorServiceInterface
 
     /**
      * Specification:
+     * - Opens a segment for an AI tool call, to be closed by endAgentToolSegment().
+     * - Does nothing when monitoring is off or no transaction is open.
+     *
+     * @api
+     */
+    public function startAgentToolSegment(string $toolName): void;
+
+    /**
+     * Specification:
+     * - Closes the segment opened for the given tool and holds it for nesting.
+     * - The segment is attached to its agent call by the next recordAgentCall().
+     *
+     * @api
+     *
+     * @param array<string, mixed> $context
+     */
+    public function endAgentToolSegment(string $toolName, array $context = []): void;
+
+    /**
+     * Specification:
+     * - Records a completed AI call as a segment spanning the given duration, with the inference
+     *   and every tool call recorded since the previous call nested inside it.
+     * - This is the shape Inspector's own agent monitoring produces: a single entry per call that
+     *   the dashboard can be opened up to reveal the tools it used, rather than tools appearing
+     *   as siblings of the call.
+     * - Optionally types the whole transaction as an agent transaction.
+     * - Does nothing when monitoring is off or no transaction is open.
+     *
+     * @api
+     *
+     * @param array<string, mixed> $inferenceContext
+     */
+    public function recordAgentCall(
+        string $agentName,
+        string $inferenceLabel,
+        float $durationInMilliseconds,
+        array $inferenceContext = [],
+    ): void;
+
+    /**
+     * Specification:
      * - Records LLM token usage as an Inspector Token entry against the open transaction.
      * - This is what feeds Inspector's AI token and cost reporting; token counts placed only
      *   in segment context are not picked up by it.

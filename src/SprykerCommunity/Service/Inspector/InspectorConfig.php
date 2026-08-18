@@ -111,6 +111,11 @@ class InspectorConfig extends AbstractBundleConfig
         return (bool)$this->get(InspectorConstants::IS_QUERY_BINDINGS_TRACKING_ENABLED, false);
     }
 
+    public function isAgentTransactionTypeEnabled(): bool
+    {
+        return (bool)$this->get(InspectorConstants::IS_AGENT_TRANSACTION_TYPE_ENABLED, true);
+    }
+
     public function isHttpClientTrackingEnabled(): bool
     {
         return (bool)$this->get(InspectorConstants::IS_HTTP_CLIENT_TRACKING_ENABLED, false);

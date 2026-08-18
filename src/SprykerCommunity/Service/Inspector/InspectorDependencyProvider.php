@@ -13,6 +13,8 @@ use Inspector\Configuration;
 use Inspector\Inspector;
 use Spryker\Service\Kernel\AbstractBundleDependencyProvider;
 use Spryker\Service\Kernel\Container;
+use SprykerCommunity\Service\Inspector\Model\AgentCallRegistry;
+use SprykerCommunity\Service\Inspector\Model\AgentCallRegistryInterface;
 use SprykerCommunity\Service\Inspector\Model\OpenSegmentRegistry;
 use SprykerCommunity\Service\Inspector\Model\OpenSegmentRegistryInterface;
 
@@ -31,13 +33,25 @@ class InspectorDependencyProvider extends AbstractBundleDependencyProvider
 
     public const string OPEN_SEGMENT_REGISTRY = 'OPEN_SEGMENT_REGISTRY';
 
+    public const string AGENT_CALL_REGISTRY = 'AGENT_CALL_REGISTRY';
+
     public function provideServiceDependencies(Container $container): Container
     {
         $container = parent::provideServiceDependencies($container);
         $container = $this->addInspectorConfiguration($container);
         $container = $this->addOpenSegmentRegistry($container);
+        $container = $this->addAgentCallRegistry($container);
 
         return $this->addInspector($container);
+    }
+
+    protected function addAgentCallRegistry(Container $container): Container
+    {
+        $container->set(static::AGENT_CALL_REGISTRY, function (): AgentCallRegistryInterface {
+            return new AgentCallRegistry();
+        });
+
+        return $container;
     }
 
     protected function addOpenSegmentRegistry(Container $container): Container

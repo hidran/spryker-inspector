@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.4.0
+
+Reshapes AI reporting to match how Inspector actually presents agent activity: one call you open up
+to reveal its tools, rather than tools listed alongside the call.
+
+### Added
+
+- `agent.workflow` segment per AI call, with the inference and every tool call nested inside it.
+- The surrounding transaction is typed `agent`, which is what lists it under the dashboard's Agent
+  section. Controlled by `INSPECTOR:IS_AGENT_TRANSACTION_TYPE_ENABLED`, on by default.
+- Agent segments carry the colour Inspector's Neuron observer uses.
+- `InspectorServiceInterface::startAgentToolSegment()`, `endAgentToolSegment()` and
+  `recordAgentCall()`.
+
+### Changed
+
+- Segment labels follow the reference format: `inference( openai/gpt-4o-mini )` and
+  `tool_call( get_content_items )`, previously the bare provider/model and tool name.
+- Tool call context keys are `Inputs` and `Output`, previously `arguments` and `result`.
+- `InspectorPostToolCallPlugin::SEGMENT_TYPE` is gone; the type is owned by the service now.
+- A transaction that has become an agent transaction is no longer re-typed. Spryker types console
+  transactions on `ConsoleTerminateEvent`, after the command has run, which otherwise relabelled an
+  agent call as `command`.
+
+### Notes
+
+- Spryker exposes no pre-prompt extension point, so a call is only observable once it has finished,
+  by which time its tool segments have opened and closed. They are held and re-parented onto the
+  agent segment afterwards, which works because Inspector serializes segments at flush time.
+- `agent.workflow` and `agent.inference` report the same duration, because Spryker exposes one
+  `inferenceTimeMs` for the whole call rather than a figure per round trip.
+- `http.client` segments stay beside the agent call rather than inside it. The Guzzle middleware has
+  no way to know a prompt is running, and adopting every request made during one would wrongly pull
+  unrelated calls in.
+
 ## 1.3.0
 
 ### Added

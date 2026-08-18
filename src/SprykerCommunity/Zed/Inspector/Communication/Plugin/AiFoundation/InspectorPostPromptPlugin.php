@@ -15,22 +15,23 @@ use Spryker\Zed\AiFoundation\Dependency\Plugin\PostPromptPluginInterface;
 use Spryker\Zed\Kernel\Communication\AbstractPlugin;
 
 /**
- * Records each completed AI prompt as an Inspector segment inside the surrounding
- * Zed transaction. The segment is backdated by PromptResponse.inferenceTimeMs, which is
- * the only timing Spryker exposes for a prompt: there is no pre-prompt extension point.
+ * Records each completed AI prompt as one agent call, with the inference and any tool calls nested
+ * inside it, matching how Inspector's own Neuron observer structures agent activity.
+ *
+ * The call is backdated by PromptResponse.inferenceTimeMs, which is the only timing Spryker
+ * exposes for a prompt: there is no pre-prompt extension point, so the call can only be recorded
+ * once it has already finished.
+ *
+ * The agent is identified by the AI configuration name, which is the closest thing Spryker has to
+ * the agent class NeuronAI names its calls after.
  *
  * @method \SprykerCommunity\Zed\Inspector\Communication\InspectorCommunicationFactory getFactory()
  */
 class InspectorPostPromptPlugin extends AbstractPlugin implements PostPromptPluginInterface
 {
-    /**
-     * Inspector classifies AI activity by the "agent." segment type prefix used by its own
-     * Neuron observer (\Inspector\Neuron\InspectorObserver::SEGMENT_TYPE). Segments outside that
-     * namespace still appear in the trace, but not under the dashboard's Agent section.
-     */
-    protected const string SEGMENT_TYPE = 'agent.inference';
-
     protected const string UNKNOWN_VALUE = 'unknown';
+
+    protected const string DEFAULT_AI_CONFIGURATION_NAME = 'default';
 
     /**
      * {@inheritDoc}
@@ -41,8 +42,8 @@ class InspectorPostPromptPlugin extends AbstractPlugin implements PostPromptPlug
         PromptRequestTransfer $promptRequestTransfer,
         PromptResponseTransfer $promptResponseTransfer,
     ): void {
-        $this->getFactory()->getInspectorService()->addCompletedSegment(
-            static::SEGMENT_TYPE,
+        $this->getFactory()->getInspectorService()->recordAgentCall(
+            $promptRequestTransfer->getAiConfigurationName() ?? static::DEFAULT_AI_CONFIGURATION_NAME,
             $this->buildLabel($promptResponseTransfer),
             (float)$promptResponseTransfer->getInferenceTimeMs(),
             $this->buildContext($promptRequestTransfer, $promptResponseTransfer),

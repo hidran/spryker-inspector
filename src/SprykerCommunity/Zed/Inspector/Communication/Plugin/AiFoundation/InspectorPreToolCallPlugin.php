@@ -29,8 +29,7 @@ class InspectorPreToolCallPlugin extends AbstractPlugin implements PreToolCallPl
      */
     public function preToolCall(AiToolCallTransfer $aiToolCallTransfer): AiToolCallTransfer
     {
-        $this->getFactory()->getInspectorService()->startSegment(
-            InspectorPostToolCallPlugin::SEGMENT_TYPE,
+        $this->getFactory()->getInspectorService()->startAgentToolSegment(
             (string)$aiToolCallTransfer->getToolName(),
         );
 

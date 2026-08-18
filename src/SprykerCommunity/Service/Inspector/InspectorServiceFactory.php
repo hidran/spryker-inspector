@@ -13,6 +13,7 @@ use Inspector\Configuration;
 use Inspector\Inspector;
 use Spryker\Service\Kernel\AbstractServiceFactory;
 use SprykerCommunity\Service\Inspector\Guzzle\InspectorGuzzleMiddleware;
+use SprykerCommunity\Service\Inspector\Model\AgentCallRegistryInterface;
 use SprykerCommunity\Service\Inspector\Model\OpenSegmentRegistryInterface;
 
 /**
@@ -33,6 +34,11 @@ class InspectorServiceFactory extends AbstractServiceFactory
     public function getOpenSegmentRegistry(): OpenSegmentRegistryInterface
     {
         return $this->getProvidedDependency(InspectorDependencyProvider::OPEN_SEGMENT_REGISTRY);
+    }
+
+    public function getAgentCallRegistry(): AgentCallRegistryInterface
+    {
+        return $this->getProvidedDependency(InspectorDependencyProvider::AGENT_CALL_REGISTRY);
     }
 
     /**

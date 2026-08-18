@@ -12,6 +12,7 @@ namespace SprykerCommunity\Service\Inspector;
 use GuzzleHttp\HandlerStack;
 use Inspector\Configuration;
 use Inspector\Inspector;
+use Inspector\Models\Segment;
 use Inspector\Models\Token;
 use Inspector\Models\Transaction;
 use Spryker\Service\Kernel\AbstractService;
@@ -23,6 +24,23 @@ use Throwable;
 class InspectorService extends AbstractService implements InspectorServiceInterface
 {
     protected const float MILLISECONDS_PER_SECOND = 1000.0;
+
+    /**
+     * Inspector classifies AI activity by the "agent." segment type prefix and the "agent"
+     * transaction type used by its own Neuron observer (\Inspector\Neuron\InspectorObserver).
+     */
+    protected const string SEGMENT_TYPE_AGENT_WORKFLOW = 'agent.workflow';
+
+    protected const string SEGMENT_TYPE_AGENT_INFERENCE = 'agent.inference';
+
+    protected const string SEGMENT_TYPE_AGENT_TOOL = 'agent.tool';
+
+    protected const string TRANSACTION_TYPE_AGENT = 'agent';
+
+    /**
+     * @see \Inspector\Neuron\InspectorObserver::STANDARD_COLOR
+     */
+    protected const string AGENT_SEGMENT_COLOR = '#FF800C';
 
     /**
      * @var array<int, string>
@@ -204,6 +222,14 @@ class InspectorService extends AbstractService implements InspectorServiceInterf
         $transaction = $this->getFactory()->getInspector()->transaction();
 
         if ($transaction === null) {
+            return;
+        }
+
+        // Spryker types console transactions on ConsoleTerminateEvent, after the command has run,
+        // which would relabel a transaction that already turned out to be an agent call. Once a
+        // transaction is an agent transaction it stays one, otherwise it never reaches the
+        // dashboard's Agent section.
+        if ($transaction->type === static::TRANSACTION_TYPE_AGENT) {
             return;
         }
 
@@ -404,6 +430,134 @@ class InspectorService extends AbstractService implements InspectorServiceInterf
         }
 
         $segment->end();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function startAgentToolSegment(string $toolName): void
+    {
+        $inspector = $this->getFactory()->getInspector();
+
+        if (!$inspector->canAddSegments()) {
+            return;
+        }
+
+        $segment = $inspector->startSegment(static::SEGMENT_TYPE_AGENT_TOOL, $this->buildToolLabel($toolName));
+        $segment->setColor(static::AGENT_SEGMENT_COLOR);
+
+        $this->getFactory()->getOpenSegmentRegistry()->add(
+            $this->buildSegmentKey(static::SEGMENT_TYPE_AGENT_TOOL, $toolName),
+            $segment,
+        );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param array<string, mixed> $context
+     */
+    public function endAgentToolSegment(string $toolName, array $context = []): void
+    {
+        $segment = $this->getFactory()->getOpenSegmentRegistry()->pull(
+            $this->buildSegmentKey(static::SEGMENT_TYPE_AGENT_TOOL, $toolName),
+        );
+
+        if ($segment === null) {
+            return;
+        }
+
+        foreach ($context as $contextKey => $contextValue) {
+            $segment->addContext($contextKey, $contextValue);
+        }
+
+        $segment->end();
+
+        $this->getFactory()->getAgentCallRegistry()->addToolSegment($segment);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param array<string, mixed> $inferenceContext
+     */
+    public function recordAgentCall(
+        string $agentName,
+        string $inferenceLabel,
+        float $durationInMilliseconds,
+        array $inferenceContext = [],
+    ): void {
+        $inspector = $this->getFactory()->getInspector();
+        $toolSegments = $this->getFactory()->getAgentCallRegistry()->pullToolSegments();
+
+        if (!$inspector->canAddSegments()) {
+            return;
+        }
+
+        $startedAt = microtime(true) - ($durationInMilliseconds / static::MILLISECONDS_PER_SECOND);
+
+        $agentSegment = $inspector->startSegment(static::SEGMENT_TYPE_AGENT_WORKFLOW, $agentName);
+        $agentSegment->setColor(static::AGENT_SEGMENT_COLOR);
+        $agentSegment->start($startedAt);
+
+        $inferenceSegment = $inspector->startSegment(static::SEGMENT_TYPE_AGENT_INFERENCE, $this->buildInferenceLabel($inferenceLabel));
+        $inferenceSegment->setColor(static::AGENT_SEGMENT_COLOR);
+        $inferenceSegment->start($startedAt);
+
+        foreach ($inferenceContext as $contextKey => $contextValue) {
+            $inferenceSegment->addContext($contextKey, $contextValue);
+        }
+
+        $inferenceSegment->end($durationInMilliseconds);
+        $agentSegment->end($durationInMilliseconds);
+
+        $this->nestUnderAgentCall($agentSegment, $toolSegments);
+        $this->applyAgentTransactionType();
+    }
+
+    /**
+     * The tool segments were opened and closed before the agent segment existed, so Inspector
+     * parented them to whatever surrounded the prompt. Re-pointing them here is what turns a flat
+     * list of siblings into one agent call that opens up to reveal its tools.
+     *
+     * @param array<int, \Inspector\Models\Segment> $toolSegments
+     */
+    protected function nestUnderAgentCall(Segment $agentSegment, array $toolSegments): void
+    {
+        foreach ($toolSegments as $toolSegment) {
+            $toolSegment->setParent($agentSegment->getHash());
+        }
+    }
+
+    /**
+     * Inspector's own agent monitoring types the surrounding transaction as an agent transaction,
+     * which is what lists it under the dashboard's Agent section. In Zed that transaction is a
+     * whole Back Office request or console command, so a request that happens to make one AI call
+     * is reported as an agent transaction rather than a request.
+     */
+    protected function applyAgentTransactionType(): void
+    {
+        if (!$this->getFactory()->getConfig()->isAgentTransactionTypeEnabled()) {
+            return;
+        }
+
+        $this->setTransactionType(static::TRANSACTION_TYPE_AGENT);
+    }
+
+    protected function buildToolLabel(string $toolName): string
+    {
+        return sprintf('tool_call( %s )', $toolName);
+    }
+
+    protected function buildInferenceLabel(string $inferenceLabel): string
+    {
+        return sprintf('inference( %s )', $inferenceLabel);
     }
 
     /**

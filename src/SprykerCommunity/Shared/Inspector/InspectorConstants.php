@@ -124,6 +124,19 @@ interface InspectorConstants
 
     /**
      * Specification:
+     * - Types a transaction that ran an AI call as an "agent" transaction, which is what lists it
+     *   under the Inspector dashboard's Agent section.
+     * - Inspector's own agent monitoring does this unconditionally. In Zed the transaction is a
+     *   whole Back Office request or console command, so a request that happens to make one AI
+     *   call is reported as an agent transaction rather than a request. Disable this to keep the
+     *   original transaction type at the cost of the Agent section staying empty.
+     *
+     * @api
+     */
+    public const string IS_AGENT_TRANSACTION_TYPE_ENABLED = 'INSPECTOR:IS_AGENT_TRANSACTION_TYPE_ENABLED';
+
+    /**
+     * Specification:
      * - Reports outbound Guzzle requests as "http.client" segments.
      * - Requires SprykerCommunity\Service\Inspector\Guzzle\InspectorGuzzleMiddleware to be pushed
      *   onto the handler stack of the clients to be traced: Spryker has no central Guzzle service
