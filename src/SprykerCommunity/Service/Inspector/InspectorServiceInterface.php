@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Service\Inspector;
 
+use GuzzleHttp\HandlerStack;
 use Inspector\Configuration;
 use Inspector\Inspector;
 use Throwable;
@@ -84,6 +85,33 @@ interface InspectorServiceInterface
      * @api
      */
     public function isQueryBindingsTrackingEnabled(): bool;
+
+    /**
+     * Specification:
+     * - Returns true when outbound Guzzle requests should be reported as segments.
+     *
+     * @api
+     */
+    public function isHttpClientTrackingEnabled(): bool;
+
+    /**
+     * Specification:
+     * - Returns true when outbound request URLs should be reported including their query string.
+     * - Query strings routinely carry API keys and personal data, so this is off unless enabled.
+     *
+     * @api
+     */
+    public function isHttpQueryTrackingEnabled(): bool;
+
+    /**
+     * Specification:
+     * - Returns a Guzzle handler stack that reports requests made through it as segments.
+     * - Pushes the Inspector middleware onto the given stack, or onto a new default stack.
+     * - Pass the result as the "handler" option of a Guzzle client.
+     *
+     * @api
+     */
+    public function createGuzzleHandlerStack(?HandlerStack $handlerStack = null): HandlerStack;
 
     /**
      * Specification:

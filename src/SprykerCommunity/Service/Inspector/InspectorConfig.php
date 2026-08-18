@@ -111,6 +111,16 @@ class InspectorConfig extends AbstractBundleConfig
         return (bool)$this->get(InspectorConstants::IS_QUERY_BINDINGS_TRACKING_ENABLED, false);
     }
 
+    public function isHttpClientTrackingEnabled(): bool
+    {
+        return (bool)$this->get(InspectorConstants::IS_HTTP_CLIENT_TRACKING_ENABLED, false);
+    }
+
+    public function isHttpQueryTrackingEnabled(): bool
+    {
+        return (bool)$this->get(InspectorConstants::IS_HTTP_QUERY_TRACKING_ENABLED, false);
+    }
+
     /**
      * Reuses the wildcard matcher shipped with the Inspector Symfony bundle so that patterns
      * behave exactly as they do for the bundle's own ignore_commands and ignore_routes options.

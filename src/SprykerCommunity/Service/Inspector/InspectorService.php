@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Service\Inspector;
 
+use GuzzleHttp\HandlerStack;
 use Inspector\Configuration;
 use Inspector\Inspector;
 use Inspector\Models\Token;
@@ -113,6 +114,40 @@ class InspectorService extends AbstractService implements InspectorServiceInterf
     public function isQueryBindingsTrackingEnabled(): bool
     {
         return $this->getFactory()->getConfig()->isQueryBindingsTrackingEnabled();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function isHttpClientTrackingEnabled(): bool
+    {
+        return $this->getFactory()->getConfig()->isHttpClientTrackingEnabled();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function isHttpQueryTrackingEnabled(): bool
+    {
+        return $this->getFactory()->getConfig()->isHttpQueryTrackingEnabled();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function createGuzzleHandlerStack(?HandlerStack $handlerStack = null): HandlerStack
+    {
+        $handlerStack = $handlerStack ?? HandlerStack::create();
+
+        $handlerStack->push($this->getFactory()->createGuzzleMiddleware());
+
+        return $handlerStack;
     }
 
     /**

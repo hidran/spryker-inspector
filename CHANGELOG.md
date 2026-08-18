@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+
+- `InspectorGuzzleMiddleware` reports outbound Guzzle requests as `http.client` segments, with
+  method, host and status code. This is the counterpart of the Symfony bundle's
+  `TraceableHttpClient`, which decorates the single `HttpClientInterface` service; Spryker has no
+  such service, so the middleware is pushed onto the handler stacks you want traced.
+- `InspectorServiceInterface::createGuzzleHandlerStack()`, for building or extending a traced stack
+  where a container is available.
+- `INSPECTOR:IS_HTTP_CLIENT_TRACKING_ENABLED` and `INSPECTOR:IS_HTTP_QUERY_TRACKING_ENABLED`.
+
+### Notes
+
+- AI provider calls are traced by passing the stack as `httpOptions.handler` in `AI_CONFIGURATIONS`,
+  which separates time spent waiting on the provider from time spent in Spryker around it. AWS
+  Bedrock is not covered: it goes through the AWS SDK rather than this client.
+- HTTP error responses arrive as responses rather than exceptions, because `HandlerStack::create()`
+  places Guzzle's `http_errors` middleware outside this one. A 401 is a completed segment with
+  `status_code: 401`; only transport failures record `error` and a null status code.
+- URLs are reported without their query string unless
+  `INSPECTOR:IS_HTTP_QUERY_TRACKING_ENABLED` is set, and credentials in the userinfo component are
+  always stripped.
+
 ## 1.1.0
 
 Brings the integration up to what the Inspector Symfony bundle reports, and adds Twig and Propel

@@ -25,12 +25,14 @@
         "symfony/http-kernel": "^6.4.0 || ^7.0.0"
     },
     "require-dev": {
+        "guzzlehttp/guzzle": "^7.5.1",
         "propel/propel": "^2.0.0",
         "spryker/ai-foundation": "^0.8.3",
         "spryker/code-sniffer": "*",
         "twig/twig": "^3.0.0"
     },
     "suggest": {
+        "guzzlehttp/guzzle": "Required to report outbound HTTP requests as Inspector segments.",
         "propel/propel": "Required to report database statements as Inspector segments.",
         "spryker/ai-foundation": "Required to report AI prompts and tool calls as Inspector segments.",
         "spryker/monitoring": "Required to report request and console transactions through the Spryker monitoring stack.",

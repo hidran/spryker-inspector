@@ -11,6 +11,7 @@ into segments for the request lifecycle, rendered templates, database statements
 | `controller` | the controller action, as `module/controller/action` |
 | `view.twig` | each rendered Twig template |
 | `db.propel` | each executed database statement, with operation and table |
+| `http.client` | each outbound Guzzle request, with method, host and status code |
 | `agent.inference` | each AI prompt, with provider, model and token usage |
 | `agent.tool` | each AI tool call, with arguments and result |
 
@@ -95,6 +96,10 @@ $config[InspectorConstants::IS_PROPEL_TRACKING_ENABLED] = filter_var(
 $config[InspectorConstants::PROPEL_SLOW_QUERY_THRESHOLD_MILLISECONDS] = (float)(
     getenv('INSPECTOR_PROPEL_SLOW_QUERY_THRESHOLD_MILLISECONDS') ?: 0
 );
+$config[InspectorConstants::IS_HTTP_CLIENT_TRACKING_ENABLED] = filter_var(
+    getenv('INSPECTOR_IS_HTTP_CLIENT_TRACKING_ENABLED') ?: false,
+    FILTER_VALIDATE_BOOLEAN,
+);
 ```
 
 | Setting | Default | Purpose |
@@ -111,6 +116,8 @@ $config[InspectorConstants::PROPEL_SLOW_QUERY_THRESHOLD_MILLISECONDS] = (float)(
 | `IS_PROPEL_TRACKING_ENABLED` | `false` | Report database statements as `db.propel` segments. |
 | `PROPEL_SLOW_QUERY_THRESHOLD_MILLISECONDS` | `0` | Only report statements at least this slow. `0` reports all of them. |
 | `IS_QUERY_BINDINGS_TRACKING_ENABLED` | `false` | Interpolate bound values into reported statements. **Sends personal data — see below.** |
+| `IS_HTTP_CLIENT_TRACKING_ENABLED` | `false` | Report outbound Guzzle requests as `http.client` segments. |
+| `IS_HTTP_QUERY_TRACKING_ENABLED` | `false` | Include query strings in reported URLs. **Sends API keys and personal data — see below.** |
 
 **`ENABLED_APPLICATIONS` matters.** The monitoring plugin is registered in the Service layer, which
 every application shares. Without this list Yves, Glue and the Merchant Portal are monitored too —
@@ -259,7 +266,77 @@ process rather than surfacing as query failures, but the code is still on the ho
   Inspector, and stops the statements grouping. It is off by default and should stay off unless you
   have a specific reason and have checked it against your data protection obligations.
 
-### 9. Rebuild caches
+### 9. Report outbound HTTP requests (optional)
+
+The Symfony bundle traces outbound HTTP by decorating the one `HttpClientInterface` service in the
+container. Spryker has no such service — `spryker/guzzle` is a metapackage with no code, and every
+module builds its own client — so this ships as a Guzzle middleware that you push onto the handler
+stack of the clients you want traced.
+
+Set `INSPECTOR_IS_HTTP_CLIENT_TRACKING_ENABLED=1`, then wire it where the client is built.
+
+**AI provider calls.** This is usually the one worth having, because it separates time spent waiting
+on the provider from time spent in Spryker around it. `AI_CONFIGURATIONS` is plain PHP config, and
+`ProviderResolver::createHttpClient()` passes `httpOptions.handler` straight to NeuronAI's Guzzle
+client, so in `config/Shared/config_ai.php`:
+
+```php
+use GuzzleHttp\HandlerStack;
+use SprykerCommunity\Service\Inspector\Guzzle\InspectorGuzzleMiddleware;
+
+$inspectorHandlerStack = HandlerStack::create();
+$inspectorHandlerStack->push(new InspectorGuzzleMiddleware());
+
+$config[AiFoundationConstants::AI_CONFIGURATIONS] = [
+    'my-configuration' => [
+        'provider_name' => AiFoundationConstants::PROVIDER_OPENAI,
+        'provider_config' => [
+            // ...
+            'httpOptions' => [
+                'handler' => $inspectorHandlerStack,
+            ],
+        ],
+    ],
+];
+```
+
+Supported for the `openai`, `anthropic`, `deepseek`, `huggingface`, `mistral`, `ollama`, `grok`,
+`azure` and `gemini` providers. Bedrock goes through the AWS SDK, not this client, and is not
+covered. Supplying `httpOptions` makes AiFoundation build its own Guzzle client, using the same
+60s/10s timeouts NeuronAI defaults to, so this does not change request behaviour.
+
+**Anywhere else**, build the stack from the service so the middleware gets the container instance:
+
+```php
+$client = new Client([
+    'handler' => $inspectorService->createGuzzleHandlerStack(),
+]);
+```
+
+Or push it onto a stack you already have: `$inspectorService->createGuzzleHandlerStack($myStack)`.
+
+What lands in the trace:
+
+```
+segment:controller     2477ms  ai-commerce/category-suggestion/index
+segment:http.client    2398ms  POST https://api.openai.com/v1/chat/completions
+segment:agent.inference 2407ms openai/gpt-4o-mini
+```
+
+Notes on behaviour:
+
+- `HandlerStack::create()` places Guzzle's own `http_errors` middleware outside this one, so HTTP
+  error responses arrive here as responses, not exceptions. A 401 is recorded as a completed
+  segment with `status_code: 401`; only transport failures (DNS, connection refused, timeout) take
+  the failure path, where `status_code` is `null` and the exception is recorded in `error`.
+- Segments are recorded when the promise settles rather than held open, so concurrent requests
+  cannot close each other's segments.
+- Retries appear as separate segments, which is how you spot a provider being hammered.
+- The label carries no query string, so requests to the same endpoint group together. Credentials
+  in the URL userinfo component are always stripped. Query strings are dropped entirely unless
+  `IS_HTTP_QUERY_TRACKING_ENABLED` is set — they routinely carry API keys and personal data.
+
+### 10. Rebuild caches
 
 ```bash
 vendor/bin/console cache:empty-all
@@ -280,6 +357,7 @@ vendor/bin/console cache:class-resolver:build
 | Response context (status, content type) | `kernel.response` | step 6 |
 | `view.twig` segment per template | Twig's `ProfilerNodeVisitor` | step 7 |
 | `db.propel` segment per statement | Propel connection `classname` | step 8 |
+| `http.client` segment per outbound request | Guzzle handler stack middleware | step 9 |
 | AI prompt segment (`agent.inference`) | `PostPromptPluginInterface`, duration from `PromptResponse.inferenceTimeMs` | step 5 |
 | AI token usage and cost | `Inspector\Models\Token` from `PromptResponse.message.usage` | step 5 |
 | AI tool call segment (`agent.tool`) | `PreToolCallPluginInterface` / `PostToolCallPluginInterface` | step 5 |
@@ -316,6 +394,8 @@ $inspectorService->endOpenSegment('integration', 'erp-sync', ['status' => 'ok'])
   `kernel.controller`. Anything recorded before that point is discarded along with the transaction.
 - Twig segments cover templates, not blocks or macros. Reporting every block would exhaust
   `MAX_ITEMS` on any real page.
-- Outbound HTTP is not traced. The Symfony bundle does this by decorating
-  `Symfony\Contracts\HttpClient\HttpClientInterface`; Spryker uses Guzzle, which needs a different
-  approach (a handler stack middleware) that this package does not yet ship.
+- Outbound HTTP tracing is opt-in per client. The Symfony bundle decorates a single
+  `HttpClientInterface` service and covers the whole application; Spryker has no equivalent, so the
+  middleware has to be pushed onto each handler stack you want traced.
+- AWS Bedrock AI calls are not traced. They go through the AWS SDK rather than the Guzzle client
+  that `httpOptions` configures.

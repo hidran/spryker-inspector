@@ -12,6 +12,7 @@ namespace SprykerCommunity\Service\Inspector;
 use Inspector\Configuration;
 use Inspector\Inspector;
 use Spryker\Service\Kernel\AbstractServiceFactory;
+use SprykerCommunity\Service\Inspector\Guzzle\InspectorGuzzleMiddleware;
 use SprykerCommunity\Service\Inspector\Model\OpenSegmentRegistryInterface;
 
 /**
@@ -32,5 +33,15 @@ class InspectorServiceFactory extends AbstractServiceFactory
     public function getOpenSegmentRegistry(): OpenSegmentRegistryInterface
     {
         return $this->getProvidedDependency(InspectorDependencyProvider::OPEN_SEGMENT_REGISTRY);
+    }
+
+    /**
+     * The middleware is left to resolve the service itself. A service factory has no handle on the
+     * service it belongs to, and the same lazy resolution is needed anyway for the handler stacks
+     * that projects assemble in configuration files, outside the container.
+     */
+    public function createGuzzleMiddleware(): InspectorGuzzleMiddleware
+    {
+        return new InspectorGuzzleMiddleware();
     }
 }

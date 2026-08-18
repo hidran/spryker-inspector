@@ -124,6 +124,28 @@ interface InspectorConstants
 
     /**
      * Specification:
+     * - Reports outbound Guzzle requests as "http.client" segments.
+     * - Requires SprykerCommunity\Service\Inspector\Guzzle\InspectorGuzzleMiddleware to be pushed
+     *   onto the handler stack of the clients to be traced: Spryker has no central Guzzle service
+     *   that could be decorated for the whole application.
+     *
+     * @api
+     */
+    public const string IS_HTTP_CLIENT_TRACKING_ENABLED = 'INSPECTOR:IS_HTTP_CLIENT_TRACKING_ENABLED';
+
+    /**
+     * Specification:
+     * - Reports outbound request URLs including their query string.
+     * - Query strings routinely carry API keys, tokens and personal data, and are transmitted to
+     *   Inspector as-is, so this stays disabled unless explicitly enabled.
+     * - Credentials in the URL userinfo component are always removed, regardless of this setting.
+     *
+     * @api
+     */
+    public const string IS_HTTP_QUERY_TRACKING_ENABLED = 'INSPECTOR:IS_HTTP_QUERY_TRACKING_ENABLED';
+
+    /**
+     * Specification:
      * - Reports Propel statements with their bound values interpolated instead of placeholders.
      * - Bound values routinely contain personal data (customer emails, addresses, order references)
      *   and are transmitted to Inspector as-is, so this stays disabled unless explicitly enabled.
