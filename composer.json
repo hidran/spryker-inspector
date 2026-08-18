@@ -1,0 +1,43 @@
+{
+    "name": "spryker-community/inspector",
+    "description": "Inspector APM integration for Spryker: request, console and AI prompt monitoring.",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "spryker",
+        "inspector",
+        "apm",
+        "monitoring",
+        "observability",
+        "ai"
+    ],
+    "require": {
+        "php": ">=8.3",
+        "inspector-apm/inspector-symfony": "^1.11",
+        "spryker/kernel": "^3.86.0",
+        "spryker/log": "^3.20.0",
+        "spryker/monitoring-extension": "^1.1.0",
+        "symfony/console": "^6.4.0 || ^7.0.0"
+    },
+    "require-dev": {
+        "spryker/ai-foundation": "^0.8.3",
+        "spryker/code-sniffer": "*"
+    },
+    "suggest": {
+        "spryker/ai-foundation": "Required to report AI prompts and tool calls as Inspector segments.",
+        "spryker/monitoring": "Required to report request and console transactions through the Spryker monitoring stack."
+    },
+    "autoload": {
+        "psr-4": {
+            "SprykerCommunity\\": "src/SprykerCommunity/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0.x-dev"
+        }
+    }
+}
